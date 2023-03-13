@@ -1,0 +1,18 @@
+SendMode Input
+
+StartWorkout(y)
+{
+  ;MsgBox Hello
+  WinActivate, Zwift
+  Sleep, 100
+  Click, 987, 1000 Left
+  Sleep, 100
+  SendRaw, e
+  Sleep, 500
+  Click, 500, %y% Left
+  Sleep, 500
+  Click, 1077, 967 Left
+}
+
+StartWorkout(420)
+ExitApp
