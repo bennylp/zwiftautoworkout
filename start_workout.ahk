@@ -8,9 +8,9 @@ StartWorkout(y)
   Click, 987, 1000 Left
   Sleep, 100
   SendRaw, e
-  Sleep, 500
+  Sleep, 250
   Click, 500, %y% Left
-  Sleep, 500
+  Sleep, 250
   Click, 1077, 967 Left
 }
 

@@ -12,7 +12,7 @@ class AutoWorkout:
         self.distance_m: float = None  # distance, in km
         self.time_secs: float = None      # zwift time
 
-        self.wo_duration_secs: float = 122 + 4
+        self.wo_duration_secs: float = 122 + 2.0 + 0.5
         self.wo_end_secs: float = None
 
         self.ahk = "ahk.bat"
@@ -27,7 +27,7 @@ class AutoWorkout:
         s = sec % 60
 
         d = int(self.distance_m)
-        info = f"{h}:{m:02d}:{s:02d} {self.distance_m/1000:6.3}"
+        info = f"{h}:{m:02d}:{s:02d} {self.distance_m/1000:7.4f}"
         return info
 
     def start_wo(self):
@@ -50,18 +50,19 @@ class AutoWorkout:
             # We're in workout
             if time >= self.wo_end_secs:
                 self.end_wo()
-        else:
+        
+        if self.wo_end_secs is None:
             # Not in workout
             excess = (distance/1000) - int(distance/1000)
             if excess < 0.050:
                 self.start_wo()
 
         if self.wo_end_secs is not None:
-            wo_info = f', WO {self.wo_end_secs - time:.0f} secs left'
+            wo_info = f'WO {self.wo_end_secs - time:.0f} secs left'
         else:
             wo_info = ''
 
-        print(f"\r{self.info()}{wo_info}     ", end='')
+        print(f"\r{self.info()} {wo_info}", end='')
         sys.stdout.flush()
 
 
@@ -156,5 +157,11 @@ def main():
     ws.run_forever()
 
 
+def test():
+    aw.distance_m = 0
+    aw.time_secs = 0
+    aw.end_wo()
+
 if __name__ == "__main__":
     main()
+    #test()
