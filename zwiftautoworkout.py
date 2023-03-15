@@ -84,6 +84,8 @@ def on_message(ws, raw_msg):
                 me = d
                 break
         if not me:
+            print(".", end='')
+            sys.stdout.flush()
             return
 
         def get(d, path):

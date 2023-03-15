@@ -11,7 +11,7 @@ StartWorkout(y)
   Sleep, 250
   Click, 500, %y% Left
   Sleep, 250
-  Click, 1077, 967 Left
+  Click, 1100, 967 Left
 }
 
 StartWorkout(420)
