@@ -12,7 +12,7 @@ class AutoWorkout:
         self.distance_m: float = None  # distance, in km
         self.time_secs: float = None      # zwift time
 
-        self.wo_duration_secs: float = 122 + 2.0 + 0.5
+        self.wo_duration_secs: float = 92 + 2.0 + 0.5
         self.wo_end_secs: float = None
 
         self.ahk = "ahk.bat"

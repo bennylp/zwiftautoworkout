@@ -11,8 +11,9 @@ StartWorkout(y)
   Sleep, 250
   Click, 500, %y% Left
   Sleep, 250
-  Click, 1100, 967 Left
+  Click, 1090, 967 Left
 }
 
-StartWorkout(420)
+;StartWorkout(420)
+StartWorkout(460)
 ExitApp
