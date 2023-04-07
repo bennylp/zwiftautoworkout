@@ -4,6 +4,7 @@ import random
 import sys
 import websocket
 import pandas as pd
+import numpy as np
 
 request_id = f'random-req-id-{random.randint(1, 100000000)}'
 sub_id = f'random-sub-id-{random.randint(1, 100000000)}'
@@ -13,8 +14,9 @@ class AutoWorkout:
     AHK_DELAY = 1.5
 
     def __init__(self):
-        self.state = pd.DataFrame(columns=['time', 'distance'],
-                                  dtype=[int,int]).set_index('time')
+        self.state = pd.DataFrame(data={'time': [0], 'distance': [0]},
+                                  columns=['time', 'distance'],
+                                  ).set_index('time')
         self.start_time: int = None
         self.end_time: int = None
         self.ahk: str = "ahk.bat"
@@ -75,6 +77,8 @@ class AutoWorkout:
         if len(self.state) > 200:
             self.state = self.state.tail(100)
 
+        avg_speed = None
+
         if self.is_in_workout():
             if time >= self.end_time:
                 self.close_dlg()
@@ -95,9 +99,9 @@ class AutoWorkout:
                 self.start_wo()
 
         if self.is_in_workout():
-            wo_info = f'WO {self.end_time - time:.0f} secs left  '
+            wo_info = f'WO {self.end_time - time:.0f} secs left '
         else:
-            wo_info = '          '
+            wo_info = ''
 
         print(f"\r{self.header()} {wo_info}", end='')
         sys.stdout.flush()
@@ -173,8 +177,8 @@ def on_open(ws):
         "data": {
             "method": "subscribe",
             "arg": {
-                #"event": "nearby", # watching, nearby, groups, etc...
-                "event": "self",
+                "event": "nearby", # watching, nearby, groups, etc...
+                #"event": "self",
                 "subId": sub_id
             }
         }
