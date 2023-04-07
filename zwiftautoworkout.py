@@ -12,7 +12,7 @@ class AutoWorkout:
         self.distance_m: float = None  # distance, in km
         self.time_secs: float = None      # zwift time
 
-        self.wo_duration_secs: float = 96 + 2.0 + 0.5
+        self.wo_duration_secs: float = 64 + 2.0 + 0.0
         self.wo_end_secs: float = None
 
         self.ahk = "ahk.bat"
@@ -112,14 +112,14 @@ def on_message(ws, raw_msg):
             show(me, "stats.activeTime")
             show(me, "stats.elapsedTime")
             print('')
-            print(json.dumps(me, sort_keys=True, indent=4))
+            #print(json.dumps(me, sort_keys=True, indent=4))
             print('\n\n')
 
         d0 = get(me, 'state.distance')
         d1 = get(me, 'state.eventDistance')
         d = float(max(d0, d1))
         t = float(get(me, 'state.time'))
-        aw.update(d, t)
+        aw.update(d0, t)
 
 def on_error(ws, error):
     print("socket error", error)
