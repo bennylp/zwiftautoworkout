@@ -3,66 +3,103 @@ import os
 import random
 import sys
 import websocket
+import pandas as pd
 
 request_id = f'random-req-id-{random.randint(1, 100000000)}'
 sub_id = f'random-sub-id-{random.randint(1, 100000000)}'
 
 class AutoWorkout:
+    WO_DURATION = 32
+    AHK_DELAY = 1.5
+
     def __init__(self):
-        self.distance_m: float = None  # distance, in km
-        self.time_secs: float = None      # zwift time
+        self.state = pd.DataFrame(columns=['time', 'distance'],
+                                  dtype=[int,int]).set_index('time')
+        self.start_time: int = None
+        self.end_time: int = None
+        self.ahk: str = "ahk.bat"
 
-        self.wo_duration_secs: float = 64 + 2.0 + 0.0
-        self.wo_end_secs: float = None
+    def is_in_workout(self) -> bool:
+        return self.end_time is not None
+    
+    def time(self) -> int:
+        """Return current time, in seconds"""
+        return self.state.index[-1] if len(self.state) else 0
 
-        self.ahk = "ahk.bat"
-
-    def info(self):
-        if self.distance_m is None:
-            return ''
-        
-        sec = int(self.time_secs)
+    def distance(self) -> int:
+        """Return current distance, in meters"""
+        return self.state['distance'].iloc[-1] if len(self.state) else 0
+    
+    def header(self) -> str:
+        sec = self.time()
         h = sec // 3600
         m = (sec % 3600) // 60
         s = sec % 60
-
-        d = int(self.distance_m)
-        info = f"{h}:{m:02d}:{s:02d} {self.distance_m/1000:7.4f}"
-        return info
+        return f"{h}:{m:02d}:{s:02d} {self.distance()/1000:7.4f}"
 
     def start_wo(self):
-        print(f'\n{self.info()} Starting workout')
-        self.wo_end_secs = self.time_secs + self.wo_duration_secs
-        cmd = f"{self.ahk} start_workout.ahk"
+        """Start workout"""
+        print(f'\n{self.header()} Starting workout')
+        self.start_time = self.time()
+        self.end_time = self.start_time + self.WO_DURATION + self.AHK_DELAY
+        cmd = f"{self.ahk} workout.ahk start"
         os.system(cmd)
 
-    def end_wo(self):
-        print(f'\n{self.info()} Ending workout')
-        self.wo_end_secs =  None
-        cmd = f"{self.ahk} end_workout.ahk"
+    def cancel_wo(self):
+        """Cancel (force end) current workout"""
+        print(f'\n{self.header()} Cancelling workout')
+        self.start_time, self.end_time =  None, None
+        cmd = f"{self.ahk} workout.ahk cancel"
         os.system(cmd)
+
+    def close_dlg(self):
+        """Close workout dialog"""
+        print(f'\n{self.header()} Closing dialog')
+        self.start_time, self.end_time =  None, None
+        cmd = f"{self.ahk} workout.ahk close"
+        os.system(cmd)
+
+    def get_avg_speed(self, secs: int = 5) -> float:
+        """Get current avg speed for the past secs seconds, in meter/sec"""
+        df = self.state.tail(secs)
+        d_dist = (df['distance'].iloc[-1] - df['distance'].iloc[0]) / 1
+        d_time = (df.index[-1] - df.index[0]) / 1
+        return d_dist / d_time
 
     def update(self, distance: float, time: float):
-        self.distance_m = distance
-        self.time_secs = time
+        """Update with the last distance and time"""
 
-        if self.wo_end_secs is not None:
-            # We're in workout
-            if time >= self.wo_end_secs:
-                self.end_wo()
-        
-        if self.wo_end_secs is None:
-            # Not in workout
-            excess = (distance/1000) - int(distance/1000)
-            if excess < 0.050:
+        distance, time = int(distance), int(time)
+        self.state.loc[time, 'distance'] = distance
+
+        if len(self.state) > 200:
+            self.state = self.state.tail(100)
+
+        if self.is_in_workout():
+            if time >= self.end_time:
+                self.close_dlg()
+            else:
+                avg_speed = self.get_avg_speed()
+                est_end_distance = int(distance + avg_speed * (self.end_time - time) + 10)
+                if (est_end_distance % 1000) <  (distance % 1000):
+                    # Workout will finish in new kilometer.
+                    # Cancel it to get kilometer bonus
+                    self.cancel_wo()
+
+        if not self.is_in_workout():
+            avg_speed = self.get_avg_speed()
+            est_end_distance = int(distance + avg_speed * (self.WO_DURATION+self.AHK_DELAY) + 10)
+            if (est_end_distance % 1000) >  (distance % 1000):
+                # Workout can finish within this kilometer
+                # Start workout
                 self.start_wo()
 
-        if self.wo_end_secs is not None:
-            wo_info = f'WO {self.wo_end_secs - time:.0f} secs left'
+        if self.is_in_workout():
+            wo_info = f'WO {self.end_time - time:.0f} secs left  '
         else:
-            wo_info = ''
+            wo_info = '          '
 
-        print(f"\r{self.info()} {wo_info}", end='')
+        print(f"\r{self.header()} {wo_info}", end='')
         sys.stdout.flush()
 
 
@@ -136,7 +173,8 @@ def on_open(ws):
         "data": {
             "method": "subscribe",
             "arg": {
-                "event": "nearby", # watching, nearby, groups, etc...
+                #"event": "nearby", # watching, nearby, groups, etc...
+                "event": "self",
                 "subId": sub_id
             }
         }
@@ -162,7 +200,7 @@ def main():
 def test():
     aw.distance_m = 0
     aw.time_secs = 0
-    aw.end_wo()
+    aw.close_dlg()
 
 if __name__ == "__main__":
     main()
