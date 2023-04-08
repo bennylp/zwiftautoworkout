@@ -178,7 +178,7 @@ def on_open(ws):
             "method": "subscribe",
             "arg": {
                 "event": "nearby", # watching, nearby, groups, etc...
-                #"event": "self",
+                #"event": "watching",
                 "subId": sub_id
             }
         }
