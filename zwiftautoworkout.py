@@ -117,13 +117,10 @@ def on_message(ws, raw_msg):
             raise Exception('subscribe request failure')
     elif msg['type'] == 'event' and msg['success']:
         data = msg['data']
-        #print()
+        #print('')
         #print(json.dumps(data, sort_keys=True, indent=4))
-        me = None
-        for d in data:
-            if d["athleteId"] == 890462:
-                me = d
-                break
+        #sys.exit(0)
+        me = data
         if not me:
             print(".", end='')
             sys.stdout.flush()
@@ -171,13 +168,14 @@ def on_close(ws, status_code, msg):
 
 
 def on_open(ws):
+    print('Connected.')
     ws.send(json.dumps({
         "type": "request",
         "uid": request_id,
         "data": {
             "method": "subscribe",
             "arg": {
-                "event": "nearby", # watching, nearby, groups, etc...
+                "event": "athlete/self", # watching, nearby, groups, etc...
                 #"event": "watching",
                 "subId": sub_id
             }

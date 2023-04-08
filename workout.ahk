@@ -1,14 +1,17 @@
 SendMode "Input"
+SetTitleMatchMode 3
 WinActivate("Zwift")
 WinGetPos( , , &ZW, &ZH, "Zwift" )
 Sleep( 100 )
 
-X_SCALE := ZW / 1936.0
-Y_SCALE := ZH / 1056.0
+;X_SCALE := ZW / 1936.0
+;Y_SCALE := ZH / 1056.0
+X_SCALE := 1.0
+Y_SCALE := 1.0
 
 WO_ITEM_X := Round( 500 * X_SCALE )
-WO_ITEM1_Y := Round(430 * Y_SCALE )
-WO_ITEM2_Y := Round( 460 * Y_SCALE )
+WO_ITEM1_Y := Round(370 * Y_SCALE )
+WO_ITEM2_Y := Round( 430 * Y_SCALE )
 
 DLG_START_X := Round( 1090 * X_SCALE )
 DLG_START_Y := Round( 967 * Y_SCALE )
@@ -18,8 +21,7 @@ DLG_END_Y := Round( 1000 * Y_SCALE )
 
 ShowInfo()
 {
-    global ZW, ZH
-    MsgBox( ZW . " " . ZH)
+    MouseMove(WO_ITEM_X, WO_ITEM1_Y)
 }
 
 StartWorkout(y)
@@ -50,7 +52,7 @@ CancelWorkout()
 {
     Loop 4
     {
-        Send( "Tab" )
+        Send( "{Tab}" )
         Sleep( 500 )
     }
 }
@@ -59,7 +61,7 @@ cmd := A_Args[1]
 
 if (cmd = "start" )
 {
-    StartWorkout(430)
+    StartWorkout(WO_ITEM1_Y)
 }
 else if (cmd = "close")
 {
