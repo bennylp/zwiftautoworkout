@@ -13,7 +13,7 @@ request_id = f'random-req-id-{random.randint(1, 100000000)}'
 sub_id = f'random-sub-id-{random.randint(1, 100000000)}'
 
 class AutoWorkout:
-    AHK_DELAY = 1.5
+    AHK_DELAY = 2
 
     def __init__(self, ftp, watt=None):
         self.watt = watt
@@ -81,7 +81,7 @@ class AutoWorkout:
         wo = self.get_matching_wo(watt)
         wo_idx = wo['idx'] + 1 # 1 based in AHK
 
-        print(f'\n{self.header()} Starting workout {wo_idx} (power: {watt})')
+        print(f'\n{self.header()} Starting workout {wo["name"]} (power: {watt})')
         self.start_time = self.time()
         self.end_time = self.start_time + wo['duration'] + self.AHK_DELAY
         cmd = f"{self.ahk} workout.ahk start {wo_idx}"
@@ -108,7 +108,7 @@ class AutoWorkout:
         d_time = (df.index[-1] - df.index[0]) / 1
         return d_dist / d_time
 
-    def get_avg_power(self, secs: int = 20) -> int:
+    def get_avg_power(self, secs: int = 30) -> int:
         """Get current avg power for the past secs seconds, in watt"""
         ewm = self.state['power'].ewm(span=secs, min_periods=1)
         avg = ewm.mean().iloc[-1]
@@ -131,7 +131,7 @@ class AutoWorkout:
             if time >= self.end_time:
                 self.close_dlg()
             else:
-                est_end_distance = int(distance + avg_speed * (self.end_time - time) + 10)
+                est_end_distance = int(distance + avg_speed * (self.end_time - time) + 20)
                 if (est_end_distance % 1000) <  (distance % 1000):
                     # Workout will finish in new kilometer.
                     # Cancel it to get kilometer bonus
@@ -161,9 +161,9 @@ def on_message(ws, raw_msg):
             raise Exception('subscribe request failure')
     elif msg['type'] == 'event' and msg['success']:
         data = msg['data']
-        print('')
-        print(json.dumps(data, sort_keys=True, indent=4))
-        sys.exit(0)
+        #print('')
+        #print(json.dumps(data, sort_keys=True, indent=4))
+        #sys.exit(0)
         me = data
         if not me:
             print(".", end='')
@@ -201,7 +201,8 @@ def on_message(ws, raw_msg):
         d1 = get(me, 'state.eventDistance')
         d = float(max(d0, d1))
         t = float(get(me, 'state.time'))
-        aw.update(d0, t)
+        p = float(get(me, 'state.power'))
+        aw.update(d0, t, p)
 
 def on_error(ws, error):
     print("socket error", error)
@@ -228,12 +229,12 @@ def on_open(ws):
 
 
 
-def main():
+def main(url):
     #websocket.enableTrace(True)
-    if len(sys.argv) < 2:
-        host = "ws://localhost:1080/api/ws/events"
+    if not url:
+        host = "ws://127.0.0.1:1080/api/ws/events"
     else:
-        host = sys.argv[1]
+        host = f'{url}/api/ws/events'
     print("Connecting to:", host)
     ws = websocket.WebSocketApp(host,
                                 on_open = on_open,
@@ -257,9 +258,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='ZwiftAutoWorkout')
     parser.add_argument('--ftp', type=int, help='Set player FTP', required=True)
     parser.add_argument('--watt', type=int, help='Use this watt for workout')
+    parser.add_argument('--url', help='Sauce4Zwift web server URL')
     
     args = parser.parse_args()
 
     aw = AutoWorkout(ftp=args.ftp, watt=args.watt)
-    main()
+    main(args.url)
     #test()

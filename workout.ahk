@@ -10,8 +10,8 @@ Y_SCALE := 1.0
 
 WO_ITEM_X := Round( 500 * X_SCALE )
 WO_ITEM_Y := Array()
-y := 370
-Loop 10
+y := 270
+Loop 9
 {
     WO_ITEM_Y.Push( Round(y * Y_SCALE ) )
     y := y + 60
@@ -23,10 +23,13 @@ DLG_START_Y := Round( 967 * Y_SCALE )
 DLG_END_X := Round( 987 * X_SCALE )
 DLG_END_Y := Round( 1000 * Y_SCALE )
 
-ShowInfo()
+ShowInfo(idx)
 {
-    cls := WinGetClass(ZTITLE)
-    MsgBox("ZW=" . ZW . ", ZH=" . ZH . ", class=" . cls)
+    ;cls := WinGetClass(ZTITLE)
+    ;MsgBox("ZW=" . ZW . ", ZH=" . ZH . ", class=" . cls)
+
+    y := WO_ITEM_Y[idx]
+    Click( WO_ITEM_X, y, "Left" )
 }
 
 ActivateZwift()
@@ -39,9 +42,9 @@ StartWorkout(idx)
 {
     y := WO_ITEM_Y[idx]
     Send( "e" )
-    Sleep( 250 )
+    Sleep( 350 )
     Click( WO_ITEM_X, y, "Left" )
-    Sleep( 250 )
+    Sleep( 350 )
     Click( DLG_START_X, DLG_START_Y, "Left" )
     Click( 1000, 967, "Left")
 }
@@ -91,7 +94,9 @@ else if (cmd = "cancel")
 }
 else if (cmd = "info")
 {
-    ShowInfo()
+    ActivateZwift()
+    idx := Integer(A_Args[2])
+    ShowInfo(idx)
 }
 
 ExitApp()

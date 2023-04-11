@@ -1,0 +1,346 @@
+{
+    "athlete": {
+        "age": null,
+        "avatar": "https://static-cdn.zwift.com/prod/profile/1172a8e9-1477282",
+        "countryCode": 360,
+        "fLast": "B.Prijono",
+        "favorite": false,
+        "firstName": "Benny",
+        "followRequest": false,
+        "follower": false,
+        "following": false,
+        "ftp": 190,
+        "fullname": "Benny Prijono",
+        "gender": "male",
+        "height": 175,
+        "id": 890462,
+        "initials": "BP",
+        "lastName": "Prijono",
+        "level": 55,
+        "name": [
+            "Benny",
+            "Prijono"
+        ],
+        "powerMeter": true,
+        "sanitizedFullname": "Benny Prijono",
+        "sanitizedName": [
+            "Benny",
+            "Prijono"
+        ],
+        "type": "NORMAL",
+        "updated": 1681206394678,
+        "wPrime": 20000,
+        "weight": 80
+    },
+    "athleteId": 890462,
+    "gap": 0,
+    "gapDistance": 0,
+    "lap": {
+        "activeTime": 0,
+        "cadence": {
+            "avg": null,
+            "max": 0,
+            "peaks": {},
+            "smooth": {}
+        },
+        "draft": {
+            "avg": null,
+            "max": 0,
+            "peaks": {
+                "1200": {
+                    "avg": null,
+                    "ts": null
+                },
+                "300": {
+                    "avg": null,
+                    "ts": null
+                },
+                "60": {
+                    "avg": null,
+                    "ts": null
+                }
+            },
+            "smooth": {
+                "1200": null,
+                "300": null,
+                "60": null
+            }
+        },
+        "elapsedTime": 29.47032589999994,
+        "hr": {
+            "avg": null,
+            "max": 0,
+            "peaks": {
+                "1200": {
+                    "avg": null,
+                    "ts": null
+                },
+                "300": {
+                    "avg": null,
+                    "ts": null
+                },
+                "60": {
+                    "avg": null,
+                    "ts": null
+                }
+            },
+            "smooth": {
+                "1200": null,
+                "300": null,
+                "60": null
+            }
+        },
+        "power": {
+            "avg": null,
+            "max": 0,
+            "peaks": {
+                "1200": {
+                    "avg": null,
+                    "ts": null
+                },
+                "15": {
+                    "avg": null,
+                    "ts": null
+                },
+                "300": {
+                    "avg": null,
+                    "ts": null
+                },
+                "5": {
+                    "avg": null,
+                    "ts": null
+                },
+                "60": {
+                    "avg": null,
+                    "ts": null
+                }
+            },
+            "smooth": {
+                "1200": null,
+                "15": null,
+                "300": null,
+                "5": null,
+                "60": null
+            }
+        },
+        "speed": {
+            "avg": null,
+            "max": 0,
+            "peaks": {
+                "1200": {
+                    "avg": null,
+                    "ts": null
+                },
+                "300": {
+                    "avg": null,
+                    "ts": null
+                },
+                "60": {
+                    "avg": null,
+                    "ts": null
+                }
+            },
+            "smooth": {
+                "1200": null,
+                "300": null,
+                "60": null
+            }
+        }
+    },
+    "lapCount": 1,
+    "lastLap": null,
+    "self": true,
+    "state": {
+        "activePowerUp": null,
+        "altitude": 12.906909179687503,
+        "athleteId": 890462,
+        "auxCourseId": 6,
+        "cadence": 0,
+        "canSteer": false,
+        "climbing": 0,
+        "companionApp": false,
+        "courseId": 6,
+        "distance": 63,
+        "draft": 0,
+        "eventDistance": 63.250654296875,
+        "eventSubgroupId": 0,
+        "grade": 0,
+        "heading": 321.0178622278655,
+        "heartrate": 65,
+        "joinTime": 0,
+        "justWatching": false,
+        "kj": 1.0512,
+        "laps": 0,
+        "latency": 36,
+        "latlng": [
+            -11.636604248533041,
+            166.97236697066788
+        ],
+        "lean": 1012460,
+        "power": 0,
+        "powerMeter": true,
+        "progress": 0,
+        "reverse": false,
+        "rideons": 1,
+        "roadCompletion": 929077,
+        "roadId": 81,
+        "roadLocation": 934077,
+        "roadPosition": 10561552,
+        "speed": 0,
+        "sport": "cycling",
+        "time": 24,
+        "turnChoice": 0,
+        "turning": null,
+        "uTurn": false,
+        "watchingAthleteId": 890462,
+        "workoutZone": null,
+        "worldTime": 267190338228,
+        "x": 91807.4609375,
+        "y": 212454.625,
+        "z": 11581.3818359375
+    },
+    "stats": {
+        "activeTime": 0,
+        "cadence": {
+            "avg": null,
+            "max": 0,
+            "peaks": {},
+            "smooth": {}
+        },
+        "draft": {
+            "avg": null,
+            "max": 0,
+            "peaks": {
+                "1200": {
+                    "avg": null,
+                    "ts": null
+                },
+                "300": {
+                    "avg": null,
+                    "ts": null
+                },
+                "60": {
+                    "avg": null,
+                    "ts": null
+                }
+            },
+            "smooth": {
+                "1200": null,
+                "300": null,
+                "60": null
+            }
+        },
+        "elapsedTime": 29.470335399999982,
+        "hr": {
+            "avg": null,
+            "max": 0,
+            "peaks": {
+                "1200": {
+                    "avg": null,
+                    "ts": null
+                },
+                "300": {
+                    "avg": null,
+                    "ts": null
+                },
+                "60": {
+                    "avg": null,
+                    "ts": null
+                }
+            },
+            "smooth": {
+                "1200": null,
+                "300": null,
+                "60": null
+            }
+        },
+        "power": {
+            "avg": null,
+            "max": 0,
+            "peaks": {
+                "1200": {
+                    "avg": null,
+                    "ts": null
+                },
+                "15": {
+                    "avg": null,
+                    "ts": null
+                },
+                "300": {
+                    "avg": null,
+                    "ts": null
+                },
+                "5": {
+                    "avg": null,
+                    "ts": null
+                },
+                "60": {
+                    "avg": null,
+                    "ts": null
+                }
+            },
+            "smooth": {
+                "1200": null,
+                "15": null,
+                "300": null,
+                "5": null,
+                "60": null
+            },
+            "timeInZones": [
+                {
+                    "time": 0,
+                    "zone": "Z1"
+                },
+                {
+                    "time": 0,
+                    "zone": "Z2"
+                },
+                {
+                    "time": 0,
+                    "zone": "Z3"
+                },
+                {
+                    "time": 0,
+                    "zone": "Z4"
+                },
+                {
+                    "time": 0,
+                    "zone": "Z5"
+                },
+                {
+                    "time": 0,
+                    "zone": "Z6"
+                },
+                {
+                    "time": 0,
+                    "zone": "Z7"
+                }
+            ],
+            "wBal": 20000
+        },
+        "speed": {
+            "avg": null,
+            "max": 0,
+            "peaks": {
+                "1200": {
+                    "avg": null,
+                    "ts": null
+                },
+                "300": {
+                    "avg": null,
+                    "ts": null
+                },
+                "60": {
+                    "avg": null,
+                    "ts": null
+                }
+            },
+            "smooth": {
+                "1200": null,
+                "300": null,
+                "60": null
+            }
+        }
+    },
+    "watching": true
+}
