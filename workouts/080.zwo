@@ -1,0 +1,11 @@
+<workout_file>
+    <author>zwiftautoworkout</author>
+    <name>05 Auto 80%</name>
+    <description></description>
+    <sportType>bike</sportType>
+    <tags/>
+    <workout>
+        <IntervalsT Repeat="2" OnDuration="8" OffDuration="8"
+                    OnPower="0.8" OffPower="0.8" pace="0"/>
+    </workout>
+</workout_file>

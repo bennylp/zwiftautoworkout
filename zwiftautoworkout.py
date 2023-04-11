@@ -1,3 +1,5 @@
+import argparse
+import glob
 import json
 import os
 import random
@@ -5,17 +7,47 @@ import sys
 import websocket
 import pandas as pd
 import numpy as np
+import xml.etree.ElementTree as ET
 
 request_id = f'random-req-id-{random.randint(1, 100000000)}'
 sub_id = f'random-sub-id-{random.randint(1, 100000000)}'
 
 class AutoWorkout:
-    WO_DURATION = 32
     AHK_DELAY = 1.5
 
-    def __init__(self):
-        self.state = pd.DataFrame(data={'time': [0], 'distance': [0]},
-                                  columns=['time', 'distance'],
+    def __init__(self, ftp, watt=None):
+        self.watt = watt
+
+        # scan workout files
+        workouts = []
+        for file in glob.glob('C:\\Users\\bennylp\\Documents\\Zwift\\Workouts\\890462\\*.zwo'):
+            tree = ET.parse(file)
+            root = tree.getroot()
+            st = root.find('sportType').text
+            if st != 'bike':
+                continue
+            it = root.find('workout').find('IntervalsT')
+            wo = dict(duration=int(it.attrib['Repeat']) * 
+                               (int(it.attrib['OnDuration']) + 
+                                int(it.attrib['OffDuration'])),
+                      power=int(float(it.attrib['OnPower']) * ftp),
+                      name=root.find('name').text,
+                     )
+            workouts.append(wo)
+        
+        self.workouts = pd.DataFrame(data=workouts).set_index('power')
+        self.workouts = self.workouts.sort_values('name')
+        self.workouts['idx'] = range(len(self.workouts))
+        self.workouts = self.workouts.head(8)
+        print('Detected workouts (max=8):')
+        print(self.workouts)
+
+        # init state dataframe
+        self.state = pd.DataFrame(data={'time': [0], 
+                                        'distance': [0],
+                                        'power': [0],
+                                        },
+                                  columns=['time', 'distance', 'power'],
                                   ).set_index('time')
         self.start_time: int = None
         self.end_time: int = None
@@ -39,12 +71,20 @@ class AutoWorkout:
         s = sec % 60
         return f"{h}:{m:02d}:{s:02d} {self.distance()/1000:7.4f}"
 
+    def get_matching_wo(self, watt=None):
+        loc = self.workouts.index.get_loc(watt, method='nearest')
+        return self.workouts.iloc[loc]
+
     def start_wo(self):
         """Start workout"""
-        print(f'\n{self.header()} Starting workout')
+        watt = self.watt or self.get_avg_power()
+        wo = self.get_matching_wo(watt)
+        wo_idx = wo['idx'] + 1 # 1 based in AHK
+
+        print(f'\n{self.header()} Starting workout {wo_idx} (power: {watt})')
         self.start_time = self.time()
-        self.end_time = self.start_time + self.WO_DURATION + self.AHK_DELAY
-        cmd = f"{self.ahk} workout.ahk start"
+        self.end_time = self.start_time + wo['duration'] + self.AHK_DELAY
+        cmd = f"{self.ahk} workout.ahk start {wo_idx}"
         os.system(cmd)
 
     def cancel_wo(self):
@@ -68,22 +108,29 @@ class AutoWorkout:
         d_time = (df.index[-1] - df.index[0]) / 1
         return d_dist / d_time
 
-    def update(self, distance: float, time: float):
-        """Update with the last distance and time"""
+    def get_avg_power(self, secs: int = 20) -> int:
+        """Get current avg power for the past secs seconds, in watt"""
+        ewm = self.state['power'].ewm(span=secs, min_periods=1)
+        avg = ewm.mean().iloc[-1]
+        return None if pd.isna(avg) else int(avg)
 
-        distance, time = int(distance), int(time)
-        self.state.loc[time, 'distance'] = distance
+    def update(self, distance: float, time: float, power: float):
+        """Update with the last distance, time, and power"""
+
+        distance, time, power = int(distance), int(time), int(power)
+        self.state.loc[time] = [distance, power]
 
         if len(self.state) > 200:
             self.state = self.state.tail(100)
+        elif len(self.state) < 5:
+            return
 
-        avg_speed = None
+        avg_speed = self.get_avg_speed()
 
         if self.is_in_workout():
             if time >= self.end_time:
                 self.close_dlg()
             else:
-                avg_speed = self.get_avg_speed()
                 est_end_distance = int(distance + avg_speed * (self.end_time - time) + 10)
                 if (est_end_distance % 1000) <  (distance % 1000):
                     # Workout will finish in new kilometer.
@@ -91,8 +138,8 @@ class AutoWorkout:
                     self.cancel_wo()
 
         if not self.is_in_workout():
-            avg_speed = self.get_avg_speed()
-            est_end_distance = int(distance + avg_speed * (self.WO_DURATION+self.AHK_DELAY) + 10)
+            wo = self.get_matching_wo(self.watt or self.get_avg_power())
+            est_end_distance = int(distance + avg_speed * (wo['duration']+self.AHK_DELAY) + 10)
             if (est_end_distance % 1000) >  (distance % 1000):
                 # Workout can finish within this kilometer
                 # Start workout
@@ -107,9 +154,6 @@ class AutoWorkout:
         sys.stdout.flush()
 
 
-aw = AutoWorkout()
-
-
 def on_message(ws, raw_msg):
     msg = json.loads(raw_msg)
     if msg['type'] == 'response':
@@ -117,9 +161,9 @@ def on_message(ws, raw_msg):
             raise Exception('subscribe request failure')
     elif msg['type'] == 'event' and msg['success']:
         data = msg['data']
-        #print('')
-        #print(json.dumps(data, sort_keys=True, indent=4))
-        #sys.exit(0)
+        print('')
+        print(json.dumps(data, sort_keys=True, indent=4))
+        sys.exit(0)
         me = data
         if not me:
             print(".", end='')
@@ -200,10 +244,22 @@ def main():
 
 
 def test():
-    aw.distance_m = 0
-    aw.time_secs = 0
-    aw.close_dlg()
+    aw = AutoWorkout(ftp=190)
+    aw.update(1000, 1, 100)
+    aw.update(1001, 2, 101.5)
+    aw.update(1002, 3, 99)
+    aw.update(1004, 4, 100)
+    aw.update(1005, 5, 101)
+    aw.update(1006, 6, 100)
+
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(prog='ZwiftAutoWorkout')
+    parser.add_argument('--ftp', type=int, help='Set player FTP', required=True)
+    parser.add_argument('--watt', type=int, help='Use this watt for workout')
+    
+    args = parser.parse_args()
+
+    aw = AutoWorkout(ftp=args.ftp, watt=args.watt)
     main()
     #test()

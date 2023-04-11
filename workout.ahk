@@ -1,8 +1,7 @@
 SendMode "Input"
 SetTitleMatchMode 3
-WinActivate("Zwift")
-WinGetPos( , , &ZW, &ZH, "Zwift" )
-Sleep( 100 )
+ZTITLE := "Zwift ahk_class GLFW30"
+WinGetPos( , , &ZW, &ZH, ZTITLE )
 
 ;X_SCALE := ZW / 1936.0
 ;Y_SCALE := ZH / 1056.0
@@ -10,8 +9,13 @@ X_SCALE := 1.0
 Y_SCALE := 1.0
 
 WO_ITEM_X := Round( 500 * X_SCALE )
-WO_ITEM1_Y := Round(370 * Y_SCALE )
-WO_ITEM2_Y := Round( 430 * Y_SCALE )
+WO_ITEM_Y := Array()
+y := 370
+Loop 10
+{
+    WO_ITEM_Y.Push( Round(y * Y_SCALE ) )
+    y := y + 60
+}
 
 DLG_START_X := Round( 1090 * X_SCALE )
 DLG_START_Y := Round( 967 * Y_SCALE )
@@ -21,17 +25,22 @@ DLG_END_Y := Round( 1000 * Y_SCALE )
 
 ShowInfo()
 {
-    MouseMove(WO_ITEM_X, WO_ITEM1_Y)
+    cls := WinGetClass(ZTITLE)
+    MsgBox("ZW=" . ZW . ", ZH=" . ZH . ", class=" . cls)
 }
 
-StartWorkout(y)
+ActivateZwift()
 {
-    ; global WO_ITEM_X, DLG_START_X, DLG_START_Y
-    ; MsgBox WO_ITEM_X . " " . DLG_START_X . " " . DLG_START_Y
+    WinActivate(ZTITLE)
+    Sleep( 100 )
+}
+
+StartWorkout(idx)
+{
+    y := WO_ITEM_Y[idx]
     Send( "e" )
     Sleep( 250 )
     Click( WO_ITEM_X, y, "Left" )
-    ;Click( 500, y, "Left" )
     Sleep( 250 )
     Click( DLG_START_X, DLG_START_Y, "Left" )
     Click( 1000, 967, "Left")
@@ -39,7 +48,6 @@ StartWorkout(y)
 
 CloseDialog()
 {
-    ; global DLG_END_X, DLG_END_Y
     Loop 1
     {
         Click( DLG_END_X, DLG_END_Y, "Left" )
@@ -61,14 +69,23 @@ cmd := A_Args[1]
 
 if (cmd = "start" )
 {
-    StartWorkout(WO_ITEM1_Y)
+    idx := Integer(A_Args[2])
+    ActivateZwift()
+    StartWorkout(idx)
+}
+else if (cmd = "hotstart" )
+{
+    idx := Integer(A_Args[2])
+    StartWorkout(idx)
 }
 else if (cmd = "close")
 {
+    ActivateZwift()
     CloseDialog()
 }
 else if (cmd = "cancel")
 {
+    ActivateZwift()
     CancelWorkout()
     CloseDialog()
 }
