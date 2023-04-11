@@ -69,19 +69,16 @@ class AutoWorkout:
         h = sec // 3600
         m = (sec % 3600) // 60
         s = sec % 60
-        return f"{h}:{m:02d}:{s:02d} {self.distance()/1000:7.4f}"
+        return f"{h}:{m:02d}:{s:02d} {self.distance()/1000:7.3f}"
 
     def get_matching_wo(self, watt=None):
         loc = self.workouts.index.get_loc(watt, method='nearest')
         return self.workouts.iloc[loc]
 
-    def start_wo(self):
+    def start_wo(self, watt, wo):
         """Start workout"""
-        watt = self.watt or self.get_avg_power()
-        wo = self.get_matching_wo(watt)
         wo_idx = wo['idx'] + 1 # 1 based in AHK
-
-        print(f'\n{self.header()} Starting workout {wo["name"]} (power: {watt})')
+        print(f'{self.header()} Starting workout {wo["name"]} (power: {watt})')
         self.start_time = self.time()
         self.end_time = self.start_time + wo['duration'] + self.AHK_DELAY
         cmd = f"{self.ahk} workout.ahk start {wo_idx}"
@@ -89,14 +86,14 @@ class AutoWorkout:
 
     def cancel_wo(self):
         """Cancel (force end) current workout"""
-        print(f'\n{self.header()} Cancelling workout')
+        print(f'{self.header()} Cancelling workout')
         self.start_time, self.end_time =  None, None
         cmd = f"{self.ahk} workout.ahk cancel"
         os.system(cmd)
 
     def close_dlg(self):
         """Close workout dialog"""
-        print(f'\n{self.header()} Closing dialog')
+        print(f'{self.header()} Closing dialog')
         self.start_time, self.end_time =  None, None
         cmd = f"{self.ahk} workout.ahk close"
         os.system(cmd)
@@ -108,10 +105,12 @@ class AutoWorkout:
         d_time = (df.index[-1] - df.index[0]) / 1
         return d_dist / d_time
 
-    def get_avg_power(self, secs: int = 30) -> int:
+    def get_avg_power(self, secs: int = 20) -> int:
         """Get current avg power for the past secs seconds, in watt"""
-        ewm = self.state['power'].ewm(span=secs, min_periods=1)
-        avg = ewm.mean().iloc[-1]
+        if True:
+            avg = self.state['power'].rolling(secs, min_periods=1).mean()[-1]
+        else:
+            avg = self.state['power'].ewm(span=secs, min_periods=1).mean().iloc[-1]
         return None if pd.isna(avg) else int(avg)
 
     def update(self, distance: float, time: float, power: float):
@@ -126,24 +125,30 @@ class AutoWorkout:
             return
 
         avg_speed = self.get_avg_speed()
+        nl = False
 
         if self.is_in_workout():
             if time >= self.end_time:
+                print('')
                 self.close_dlg()
+                nl = True
             else:
-                est_end_distance = int(distance + avg_speed * (self.end_time - time) + 20)
-                if (est_end_distance % 1000) <  (distance % 1000):
-                    # Workout will finish in new kilometer.
-                    # Cancel it to get kilometer bonus
+                est_end_distance = int(distance + avg_speed * (self.end_time - time) + 10)
+                if (est_end_distance//1000) >  (distance//1000):
+                    print('')
+                    print(f'{self.header()} Est. end for cur wo: {est_end_distance/1000:7.3f}')
                     self.cancel_wo()
+                    nl = True
 
         if not self.is_in_workout():
-            wo = self.get_matching_wo(self.watt or self.get_avg_power())
-            est_end_distance = int(distance + avg_speed * (wo['duration']+self.AHK_DELAY) + 10)
-            if (est_end_distance % 1000) >  (distance % 1000):
-                # Workout can finish within this kilometer
-                # Start workout
-                self.start_wo()
+            watt = self.watt or self.get_avg_power()
+            wo = self.get_matching_wo(watt)
+            est_end_distance = int(distance + avg_speed * (wo['duration']+self.AHK_DELAY) + 20)
+            if (est_end_distance//1000) ==  (distance//1000):
+                if not nl:
+                    print('')
+                print(f'{self.header()} Est. end for NEW wo: {est_end_distance/1000:7.3f}')
+                self.start_wo(watt, wo)
 
         if self.is_in_workout():
             wo_info = f'WO {self.end_time - time:.0f} secs left '
@@ -257,8 +262,8 @@ def test():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='ZwiftAutoWorkout')
     parser.add_argument('--ftp', type=int, help='Set player FTP', required=True)
-    parser.add_argument('--watt', type=int, help='Use this watt for workout')
-    parser.add_argument('--url', help='Sauce4Zwift web server URL')
+    parser.add_argument('--watt', type=int, help='Lock workout at this power')
+    parser.add_argument('--url', help='Explicit Sauce4Zwift web server URL (start with ws://)')
     
     args = parser.parse_args()
 
