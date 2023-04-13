@@ -52,6 +52,8 @@ class AutoWorkout:
         self.start_time: int = None
         self.end_time: int = None
         self.ahk: str = "ahk.bat"
+        self.last_cancel_time = 0
+        self.last_cancel_km = -1
 
     def is_in_workout(self) -> bool:
         return self.end_time is not None
@@ -89,6 +91,8 @@ class AutoWorkout:
         print(f'{self.header()} Cancelling workout')
         self.start_time, self.end_time =  None, None
         cmd = f"{self.ahk} workout.ahk cancel"
+        self.last_cancel_time = self.time()
+        self.last_cancel_km = self.distance() // 1000
         os.system(cmd)
 
     def close_dlg(self):
@@ -143,8 +147,12 @@ class AutoWorkout:
         if not self.is_in_workout():
             watt = self.watt or self.get_avg_power()
             wo = self.get_matching_wo(watt)
-            est_end_distance = int(distance + avg_speed * (wo['duration']+self.AHK_DELAY) + 20)
-            if (est_end_distance//1000) ==  (distance//1000):
+            est_end_distance = int(distance + avg_speed * (wo['duration']+self.AHK_DELAY) + 10)
+            # Check if new workout can end within this km and we're not recently cancelled
+            if (est_end_distance//1000 == distance//1000 and not
+                (distance//1000 == self.last_cancel_km and
+                 self.time() - self.last_cancel_time <= 5
+                )):
                 if not nl:
                     print('')
                 print(f'{self.header()} Est. end for NEW wo: {est_end_distance/1000:7.3f}')
