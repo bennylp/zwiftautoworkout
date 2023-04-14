@@ -112,7 +112,7 @@ class AutoWorkout:
     def get_avg_power(self, secs: int = 20) -> int:
         """Get current avg power for the past secs seconds, in watt"""
         if True:
-            avg = self.state['power'].rolling(secs, min_periods=1).mean()[-1]
+            avg = self.state['power'].rolling(secs, min_periods=1).mean().iloc[-1]
         else:
             avg = self.state['power'].ewm(span=secs, min_periods=1).mean().iloc[-1]
         return None if pd.isna(avg) else int(avg)
