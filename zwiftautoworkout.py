@@ -151,7 +151,7 @@ class AutoWorkout:
             # Check if new workout can end within this km and we're not recently cancelled
             if (est_end_distance//1000 == distance//1000 and not
                 (distance//1000 == self.last_cancel_km and
-                 self.time() - self.last_cancel_time <= 5
+                 self.time() - self.last_cancel_time <= 10
                 )):
                 if not nl:
                     print('')
