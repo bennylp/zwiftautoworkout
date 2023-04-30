@@ -90,6 +90,7 @@ else if (cmd = "cancel")
 {
     ActivateZwift()
     CancelWorkout()
+    Sleep(500)
     CloseDialog()
 }
 else if (cmd = "info")

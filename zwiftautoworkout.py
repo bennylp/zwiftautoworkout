@@ -11,11 +11,14 @@ import xml.etree.ElementTree as ET
 
 request_id = f'random-req-id-{random.randint(1, 100000000)}'
 sub_id = f'random-sub-id-{random.randint(1, 100000000)}'
+aw = None
+args = None
 
 class AutoWorkout:
     AHK_DELAY = 2
 
     def __init__(self, ftp, watt=None):
+        print(f"Profile FTP={ftp}")
         self.watt = watt
 
         # scan workout files
@@ -168,6 +171,8 @@ class AutoWorkout:
 
 
 def on_message(ws, raw_msg):
+    global aw
+
     msg = json.loads(raw_msg)
     if msg['type'] == 'response':
         if not msg['success']:
@@ -210,9 +215,10 @@ def on_message(ws, raw_msg):
             #print(json.dumps(me, sort_keys=True, indent=4))
             print('\n\n')
 
-        d0 = get(me, 'state.distance')
-        d1 = get(me, 'state.eventDistance')
-        d = float(max(d0, d1))
+        if aw is None:
+            aw = AutoWorkout(ftp=get(me, 'athlete.ftp'), watt=args.watt)
+
+        d0 = float(get(me, 'state.distance'))
         t = float(get(me, 'state.time'))
         p = float(get(me, 'state.power'))
         aw.update(d0, t, p)
@@ -242,12 +248,12 @@ def on_open(ws):
 
 
 
-def main(url):
+def main():
     #websocket.enableTrace(True)
-    if not url:
+    if not args.url:
         host = "ws://127.0.0.1:1080/api/ws/events"
     else:
-        host = f'{url}/api/ws/events'
+        host = f'{args.url}/api/ws/events'
     print("Connecting to:", host)
     ws = websocket.WebSocketApp(host,
                                 on_open = on_open,
@@ -258,6 +264,7 @@ def main(url):
 
 
 def test():
+    global aw
     aw = AutoWorkout(ftp=190)
     aw.update(1000, 1, 100)
     aw.update(1001, 2, 101.5)
@@ -269,12 +276,12 @@ def test():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='ZwiftAutoWorkout')
-    parser.add_argument('--ftp', type=int, help='Set player FTP', required=True)
+    #parser.add_argument('--ftp', type=int, help='Set player FTP', required=True)
     parser.add_argument('--watt', type=int, help='Lock workout at this power')
     parser.add_argument('--url', help='Explicit Sauce4Zwift web server URL (start with ws://)')
     
     args = parser.parse_args()
 
-    aw = AutoWorkout(ftp=args.ftp, watt=args.watt)
-    main(args.url)
+    #aw = AutoWorkout(ftp=args.ftp, watt=args.watt)
+    main()
     #test()
