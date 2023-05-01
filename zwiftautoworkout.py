@@ -141,7 +141,7 @@ class AutoWorkout:
                 nl = True
             else:
                 est_end_distance = int(distance + avg_speed * (self.end_time - time) + 10)
-                if (est_end_distance//1000) >  (distance//1000):
+                if (est_end_distance//1000) >  (distance//1000): # and int(distance)%1000 < 80:
                     print('')
                     print(f'{self.header()} Est. end for cur wo: {est_end_distance/1000:7.3f}')
                     self.cancel_wo()
