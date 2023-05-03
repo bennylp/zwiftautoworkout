@@ -7,7 +7,9 @@ import sys
 import websocket
 import pandas as pd
 import numpy as np
+import time
 import xml.etree.ElementTree as ET
+from typing import Literal
 
 request_id = f'random-req-id-{random.randint(1, 100000000)}'
 sub_id = f'random-sub-id-{random.randint(1, 100000000)}'
@@ -23,7 +25,8 @@ class AutoWorkout:
 
         # scan workout files
         workouts = []
-        for file in glob.glob('C:\\Users\\bennylp\\Documents\\Zwift\\Workouts\\890462\\*.zwo'):
+        # 'C:\\Users\\bennylp\\Documents\\Zwift\\Workouts\\890462\\*.zwo'
+        for file in glob.glob('workouts/*.zwo'):
             tree = ET.parse(file)
             root = tree.getroot()
             st = root.find('sportType').text
@@ -74,7 +77,10 @@ class AutoWorkout:
         h = sec // 3600
         m = (sec % 3600) // 60
         s = sec % 60
-        return f"{h}:{m:02d}:{s:02d} {self.distance()/1000:7.3f}"
+
+        avg_speed = self.get_avg_speed(output='kph')
+        avg_power = self.get_avg_power()
+        return f"{h}:{m:02d}:{s:02d} {self.distance()/1000:.3f} {avg_speed:4.1f}kph {avg_power:3.0f}w"
 
     def get_matching_wo(self, watt=None):
         loc = self.workouts.index.get_loc(watt, method='nearest')
@@ -83,7 +89,7 @@ class AutoWorkout:
     def start_wo(self, watt, wo):
         """Start workout"""
         wo_idx = wo['idx'] + 1 # 1 based in AHK
-        print(f'{self.header()} Starting workout {wo["name"]} (power: {watt})')
+        print(f'''{self.header()} Starting workout "{wo['name']}" (avg power: {watt})''')
         self.start_time = self.time()
         self.end_time = self.start_time + wo['duration'] + self.AHK_DELAY
         cmd = f"{self.ahk} workout.ahk start {wo_idx}"
@@ -105,12 +111,16 @@ class AutoWorkout:
         cmd = f"{self.ahk} workout.ahk close"
         os.system(cmd)
 
-    def get_avg_speed(self, secs: int = 5) -> float:
-        """Get current avg speed for the past secs seconds, in meter/sec"""
+    def get_avg_speed(self, secs: int = 5, output: Literal['mps', 'kph', 'mph']='mps') -> float:
+        """Get current avg speed for the past secs seconds, in meter per second,
+        km/h, or miles/h"""
         df = self.state.tail(secs)
         d_dist = (df['distance'].iloc[-1] - df['distance'].iloc[0]) / 1
         d_time = (df.index[-1] - df.index[0]) / 1
-        return d_dist / d_time
+        mps = d_dist / max(d_time,1)  # meter per second
+        return (mps if output=='mps' else
+                mps*3600/1000 if output=='kph' else
+                mps*3600/1609.344)
 
     def get_avg_power(self, secs: int = 20) -> int:
         """Get current avg power for the past secs seconds, in watt"""
@@ -126,13 +136,19 @@ class AutoWorkout:
         distance, time, power = int(distance), int(time), int(power)
         self.state.loc[time] = [distance, power]
 
+        def prog(t: float) -> str:
+            s = '|/-\\'
+            return s[int(t) % len(s)]
+
         if len(self.state) > 200:
             self.state = self.state.tail(100)
         elif len(self.state) < 5:
+            print(f"\r{self.header()} {prog(time)}", end='')
             return
 
         avg_speed = self.get_avg_speed()
         nl = False
+        est_end_distance = None
 
         if self.is_in_workout():
             if time >= self.end_time:
@@ -140,33 +156,32 @@ class AutoWorkout:
                 self.close_dlg()
                 nl = True
             else:
-                est_end_distance = int(distance + avg_speed * (self.end_time - time) + 10)
-                if (est_end_distance//1000) >  (distance//1000): # and int(distance)%1000 < 80:
+                est_end_distance = int(distance + avg_speed * (self.end_time - time))
+                if ((est_end_distance+10)//1000) >  (distance//1000) and int(distance)%1000 >= 950:
                     print('')
-                    print(f'{self.header()} Est. end for cur wo: {est_end_distance/1000:7.3f}')
+                    print(f'{self.header()} Est. end for cur wo: {(est_end_distance+10)/1000:.3f}')
                     self.cancel_wo()
                     nl = True
 
         if not self.is_in_workout():
             watt = self.watt or self.get_avg_power()
             wo = self.get_matching_wo(watt)
-            est_end_distance = int(distance + avg_speed * (wo['duration']+self.AHK_DELAY) + 10)
+            est_end_distance = int(distance + avg_speed * (wo['duration']+self.AHK_DELAY))
             # Check if new workout can end within this km and we're not recently cancelled
-            if (est_end_distance//1000 == distance//1000 and not
+            if ((est_end_distance+10)//1000 == distance//1000 and not
                 (distance//1000 == self.last_cancel_km and
-                 self.time() - self.last_cancel_time <= 10
+                 self.time() - self.last_cancel_time <= 5
                 )):
                 if not nl:
                     print('')
-                print(f'{self.header()} Est. end for NEW wo: {est_end_distance/1000:7.3f}')
                 self.start_wo(watt, wo)
 
         if self.is_in_workout():
-            wo_info = f'WO {self.end_time - time:.0f} secs left '
+            wo_info = f'{self.end_time - time:.0f} secs left [est. end: {est_end_distance/1000:.3f}]'
         else:
-            wo_info = ''
+            wo_info = prog(time)
 
-        print(f"\r{self.header()} {wo_info}", end='')
+        print(f"\r{self.header()} {wo_info} ", end='')
         sys.stdout.flush()
 
 
@@ -179,49 +194,13 @@ def on_message(ws, raw_msg):
             raise Exception('subscribe request failure')
     elif msg['type'] == 'event' and msg['success']:
         data = msg['data']
-        #print('')
-        #print(json.dumps(data, sort_keys=True, indent=4))
-        #sys.exit(0)
-        me = data
-        if not me:
-            print(".", end='')
-            sys.stdout.flush()
-            return
-
-        def get(d, path):
-            keys = path.split('.')
-            for key in keys:
-                try:
-                    d = d[key]
-                except Exception as e:
-                    print(f'{str(e)}: {key} in {path}')
-                    raise
-
-            return d
-
-        def show(d, path):
-            print(f'{path}: {get(d, path)}')
-
-        if False:
-            show(me, "lap.activeTime")
-            show(me, "lap.elapsedTime")
-            show(me, "state.distance")
-            show(me, "state.eventDistance")
-            show(me, "state.time")
-            show(me, "stats.activeTime")
-            show(me, "stats.activeTime")
-            show(me, "stats.elapsedTime")
-            print('')
-            #print(json.dumps(me, sort_keys=True, indent=4))
-            print('\n\n')
-
         if aw is None:
-            aw = AutoWorkout(ftp=get(me, 'athlete.ftp'), watt=args.watt)
+            aw = AutoWorkout(ftp=data['athlete']['ftp'], watt=args.watt)
 
-        d0 = float(get(me, 'state.distance'))
-        t = float(get(me, 'state.time'))
-        p = float(get(me, 'state.power'))
-        aw.update(d0, t, p)
+        d = float(data['state']['distance'])
+        t = float(data['state']['time'])
+        p = float(data['state']['power'])
+        aw.update(d, t, p)
 
 def on_error(ws, error):
     print("socket error", error)
@@ -240,7 +219,6 @@ def on_open(ws):
             "method": "subscribe",
             "arg": {
                 "event": "athlete/self", # watching, nearby, groups, etc...
-                #"event": "watching",
                 "subId": sub_id
             }
         }
@@ -265,23 +243,49 @@ def main():
 
 def test():
     global aw
-    aw = AutoWorkout(ftp=190)
-    aw.update(1000, 1, 100)
-    aw.update(1001, 2, 101.5)
-    aw.update(1002, 3, 99)
-    aw.update(1004, 4, 100)
-    aw.update(1005, 5, 101)
-    aw.update(1006, 6, 100)
+    ftp = 190
+    aw = AutoWorkout(ftp=ftp)
+    aw.AHK_DELAY = 0
+    aw.ahk = 'true'
+
+    first = [
+        (40,4),   # initial wait
+        (330,32),
+        (300,32),
+        (330,32), # the last workout will be cancelled
+    ]
+    assert sum([e[0] for e in first])==1000
+
+    loop = [
+        (150,16), (180,16),   # workout
+        (200,16), (130, 16),  # workout
+        (130, 18), (210, 14), # this workout will be cancelled
+    ]
+    assert sum([e[0] for e in loop])==1000
+    assert sum([e[1] for e in loop])==32*3
+    specs = first + loop * 5
+
+    distance = 0
+    t = 0
+    for delta, dur in specs:
+        speed = delta / dur
+        kph = speed / 1000 * 3600
+        for _ in range(dur):
+            aw.update(distance, t, ftp / 2 * kph / 20)
+            distance += speed
+            t += 1
+            time.sleep(0.5)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='ZwiftAutoWorkout')
-    #parser.add_argument('--ftp', type=int, help='Set player FTP', required=True)
     parser.add_argument('--watt', type=int, help='Lock workout at this power')
     parser.add_argument('--url', help='Explicit Sauce4Zwift web server URL (start with ws://)')
+    parser.add_argument('--test', help='Run test', action='store', nargs='*')
     
     args = parser.parse_args()
 
-    #aw = AutoWorkout(ftp=args.ftp, watt=args.watt)
-    main()
-    #test()
+    if args.test is not None:
+        test()
+    else:
+        main()
