@@ -114,15 +114,15 @@ class AutoWorkout:
     def get_avg_speed(self, secs: int = 5, output: Literal['mps', 'kph', 'mph']='mps') -> float:
         """Get current avg speed for the past secs seconds, in meter per second,
         km/h, or miles/h"""
-        df = self.state.tail(secs)
-        d_dist = (df['distance'].iloc[-1] - df['distance'].iloc[0]) / 1
-        d_time = (df.index[-1] - df.index[0]) / 1
+        df = self.state.tail(secs+1)
+        d_dist = (df['distance'].iloc[-2] - df['distance'].iloc[0]) / 1
+        d_time = (df.index[-2] - df.index[0]) / 1
         mps = d_dist / max(d_time,1)  # meter per second
         return (mps if output=='mps' else
                 mps*3600/1000 if output=='kph' else
                 mps*3600/1609.344)
 
-    def get_avg_power(self, secs: int = 20) -> int:
+    def get_avg_power(self, secs: int = 5) -> int:
         """Get current avg power for the past secs seconds, in watt"""
         if True:
             avg = self.state['power'].rolling(secs, min_periods=1).mean().iloc[-1]
