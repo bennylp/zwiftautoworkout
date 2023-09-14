@@ -3,14 +3,15 @@ SetTitleMatchMode 3
 ZTITLE := "Zwift ahk_class GLFW30"
 WinGetPos( , , &ZW, &ZH, ZTITLE )
 
-;X_SCALE := ZW / 1936.0
+X_SCALE := ZW / 1936.0
 ;Y_SCALE := ZH / 1056.0
-X_SCALE := 1.0
-Y_SCALE := 1.0
+Y_SCALE := ZH / 1150.0
+;X_SCALE := 1.0
+;Y_SCALE := 1.0
 
 WO_ITEM_X := Round( 500 * X_SCALE )
 WO_ITEM_Y := Array()
-y := 270
+y := 210
 Loop 9
 {
     WO_ITEM_Y.Push( Round(y * Y_SCALE ) )
@@ -18,7 +19,7 @@ Loop 9
 }
 
 DLG_START_X := Round( 1090 * X_SCALE )
-DLG_START_Y := Round( 967 * Y_SCALE )
+DLG_START_Y := Round( 1000 * Y_SCALE )
 
 DLG_END_X := Round( 987 * X_SCALE )
 DLG_END_Y := Round( 1000 * Y_SCALE )
@@ -46,7 +47,9 @@ StartWorkout(idx)
     Click( WO_ITEM_X, y, "Left" )
     Sleep( 350 )
     Click( DLG_START_X, DLG_START_Y, "Left" )
-    Click( 1000, 967, "Left")
+    ;Sleep( 100 )
+    ;Click( DLG_START_X, DLG_START_Y, "Left" )
+    ;Click( 1000, 967, "Left")
 }
 
 CloseDialog()
