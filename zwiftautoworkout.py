@@ -16,6 +16,8 @@ sub_id = f'random-sub-id-{random.randint(1, 100000000)}'
 aw = None
 args = None
 
+MIN_DIST_BEFORE_WORKOUT_IN_UTURN_MODE = 50
+
 class AutoWorkout:
     AHK_DELAY = 2
 
@@ -88,36 +90,37 @@ class AutoWorkout:
         loc = self.workouts.index.get_loc(watt, method='nearest')
         return self.workouts.iloc[loc]
 
+    def _ahk(self, arg):
+        """Invoke autohotkey"""
+        cmd = f"{self.ahk} workout.ahk {arg}"
+        os.system(cmd)
+
     def start_wo(self, watt, wo):
         """Start workout"""
         wo_idx = wo['idx'] + 1 # 1 based in AHK
         print(f'''{self.header()} Starting workout "{wo['name']}" (avg power: {watt})''')
         self.start_time = self.time()
         self.end_time = self.start_time + wo['duration'] + self.AHK_DELAY
-        cmd = f"{self.ahk} workout.ahk start {wo_idx}"
-        os.system(cmd)
+        self._ahk(f"start {wo_idx}")
 
     def cancel_wo(self):
         """Cancel (force end) current workout"""
         print(f'{self.header()} Cancelling workout')
         self.start_time, self.end_time =  None, None
-        cmd = f"{self.ahk} workout.ahk cancel"
         self.last_cancel_time = self.time()
         self.last_cancel_km = self.distance() // 1000
-        os.system(cmd)
+        self._ahk(f"cancel")
 
     def close_dlg(self):
         """Close workout dialog"""
         print(f'{self.header()} Closing dialog')
         self.start_time, self.end_time =  None, None
-        cmd = f"{self.ahk} workout.ahk close"
-        os.system(cmd)
+        self._ahk("close")
 
     def uturn(self):
-        """Close workout dialog"""
+        """Initiate U-Turn"""
         print(f'{self.header()} U-Turn')
-        cmd = f"{self.ahk} workout.ahk uturn"
-        os.system(cmd)
+        self._ahk(f"uturn")
         self.uturn_done = True
 
     def get_avg_speed(self, secs: int = 5, output: Literal['mps', 'kph', 'mph']='mps') -> float:
@@ -160,11 +163,13 @@ class AutoWorkout:
         est_end_distance = None
 
         if self.uturn_mode:
-            if (distance % 1000) < 475:
-                if self.uturn_done:
+            if self.uturn_done:
+                if (distance % 1000) < 300:
                     self.uturn_done = False
             else:
-                if not self.uturn_done:
+                # It took approx 3 seconds to make a U-turn
+                turn_distance = int(distance + avg_speed * 3)
+                if (turn_distance % 1000) >= 500:
                     self.uturn()
 
         if self.is_in_workout():
@@ -193,11 +198,15 @@ class AutoWorkout:
                     # If we're in U-turn mode, wait some time before starting a workout to allow
                     # collecting arch bonus
                     not self.uturn_mode or 
-                    (distance%1000) >= 50
+                    (distance%1000) >= MIN_DIST_BEFORE_WORKOUT_IN_UTURN_MODE
                 )
                 ):
                 if not nl:
                     print('')
+                if self.uturn_mode:
+                    # Spend powerups if we're in U-Turn mode, in case we're not using
+                    # TT bike
+                    self._ahk("spacebar")
                 self.start_wo(watt, wo)
 
         if self.is_in_workout():

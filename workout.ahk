@@ -101,10 +101,14 @@ else if (cmd = "cancel")
 else if (cmd = "uturn")
 {
     ActivateZwift()
-    Sleep(200)
     Send("{Down down}")
-    Sleep(3000)
+    Sleep(2900)
     Send("{Down up}")
+}
+else if (cmd = "spacebar")
+{
+    ActivateZwift()
+    Send("{Space}")
 }
 else if (cmd = "info")
 {
