@@ -19,9 +19,11 @@ args = None
 class AutoWorkout:
     AHK_DELAY = 2
 
-    def __init__(self, ftp, watt=None):
+    def __init__(self, ftp, watt=None, uturn: bool = False):
         print(f"Profile FTP={ftp}")
         self.watt = watt
+        self.uturn_mode = uturn
+        self.uturn_done = False
 
         # scan workout files
         workouts = []
@@ -111,6 +113,13 @@ class AutoWorkout:
         cmd = f"{self.ahk} workout.ahk close"
         os.system(cmd)
 
+    def uturn(self):
+        """Close workout dialog"""
+        print(f'{self.header()} U-Turn')
+        cmd = f"{self.ahk} workout.ahk uturn"
+        os.system(cmd)
+        self.uturn_done = True
+
     def get_avg_speed(self, secs: int = 5, output: Literal['mps', 'kph', 'mph']='mps') -> float:
         """Get current avg speed for the past secs seconds, in meter per second,
         km/h, or miles/h"""
@@ -150,6 +159,14 @@ class AutoWorkout:
         nl = False
         est_end_distance = None
 
+        if self.uturn_mode:
+            if (distance % 1000) < 475:
+                if self.uturn_done:
+                    self.uturn_done = False
+            else:
+                if not self.uturn_done:
+                    self.uturn()
+
         if self.is_in_workout():
             if time >= self.end_time:
                 print('')
@@ -171,7 +188,14 @@ class AutoWorkout:
             if ((est_end_distance+10)//1000 == distance//1000 and not
                 (distance//1000 == self.last_cancel_km and
                  self.time() - self.last_cancel_time <= 5
-                )):
+                ) and
+                (
+                    # If we're in U-turn mode, wait some time before starting a workout to allow
+                    # collecting arch bonus
+                    not self.uturn_mode or 
+                    (distance%1000) >= 50
+                )
+                ):
                 if not nl:
                     print('')
                 self.start_wo(watt, wo)
@@ -195,7 +219,7 @@ def on_message(ws, raw_msg):
     elif msg['type'] == 'event' and msg['success']:
         data = msg['data']
         if aw is None:
-            aw = AutoWorkout(ftp=data['athlete']['ftp'], watt=args.watt)
+            aw = AutoWorkout(ftp=data['athlete']['ftp'], watt=args.watt, uturn=args.uturn)
 
         d = float(data['state']['distance'])
         t = float(data['state']['time'])
@@ -281,6 +305,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='ZwiftAutoWorkout')
     parser.add_argument('--watt', type=int, help='Lock workout at this power')
     parser.add_argument('--url', help='Explicit Sauce4Zwift web server URL (start with ws://)')
+    parser.add_argument('--uturn', help='Perform U-turn at x.5 km')
     parser.add_argument('--test', help='Run test', action='store', nargs='*')
     
     args = parser.parse_args()
