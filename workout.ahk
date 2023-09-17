@@ -57,7 +57,7 @@ CloseDialog()
     Loop 1
     {
         Click( DLG_END_X, DLG_END_Y, "Left" )
-        Sleep( 50 )
+        Sleep( 250 )
         Send("{Esc}")
         ; Click( 987, 1000, "Left" )
         Sleep( 500 )

@@ -16,7 +16,7 @@ sub_id = f'random-sub-id-{random.randint(1, 100000000)}'
 aw = None
 args = None
 
-MIN_DIST_BEFORE_WORKOUT_IN_UTURN_MODE = 50
+MIN_DIST_BEFORE_WORKOUT_IN_UTURN_MODE = 80
 
 class AutoWorkout:
     AHK_DELAY = 2
@@ -98,10 +98,10 @@ class AutoWorkout:
     def start_wo(self, watt, wo):
         """Start workout"""
         wo_idx = wo['idx'] + 1 # 1 based in AHK
-        print(f'''{self.header()} Starting workout "{wo['name']}" (avg power: {watt})''')
-        self.start_time = self.time()
-        self.end_time = self.start_time + wo['duration'] + self.AHK_DELAY
+        print(f'''{self.header()} Starting workout "{wo['name']}" (avg power: {watt}), dur: {wo['duration']}''')
         self._ahk(f"start {wo_idx}")
+        self.start_time = self.time()
+        self.end_time = self.start_time + wo['duration'] + self.AHK_DELAY + 0.5
 
     def cancel_wo(self):
         """Cancel (force end) current workout"""
@@ -169,7 +169,7 @@ class AutoWorkout:
             else:
                 # It took approx 3 seconds to make a U-turn
                 turn_distance = int(distance + avg_speed * 3)
-                if (turn_distance % 1000) >= 500:
+                if distance > 1000 and (turn_distance % 1000) >= 493:
                     self.uturn()
 
         if self.is_in_workout():
