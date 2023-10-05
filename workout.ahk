@@ -36,6 +36,7 @@ ShowInfo(idx)
 ActivateZwift()
 {
     WinActivate(ZTITLE)
+    MouseMove(870, 500)
     Sleep( 100 )
 }
 
@@ -89,6 +90,7 @@ else if (cmd = "hotstart" )
 else if (cmd = "close")
 {
     ActivateZwift()
+    ActivateZwift()
     CloseDialog()
 }
 else if (cmd = "cancel")
@@ -96,6 +98,7 @@ else if (cmd = "cancel")
     ActivateZwift()
     CancelWorkout()
     Sleep(500)
+    ActivateZwift()
     CloseDialog()
 }
 else if (cmd = "uturn")

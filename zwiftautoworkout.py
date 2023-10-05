@@ -8,6 +8,7 @@ import websocket
 import pandas as pd
 import numpy as np
 import time
+import winsound
 import xml.etree.ElementTree as ET
 from typing import Literal
 
@@ -16,7 +17,13 @@ sub_id = f'random-sub-id-{random.randint(1, 100000000)}'
 aw = None
 args = None
 
-MIN_DIST_BEFORE_WORKOUT_IN_UTURN_MODE = 80
+MIN_DIST_BEFORE_WORKOUT_IN_UTURN_MODE = 30
+
+
+def warn():
+    for i in range(3):
+        winsound.Beep(2000, 50)
+
 
 class AutoWorkout:
     AHK_DELAY = 2
@@ -92,8 +99,10 @@ class AutoWorkout:
 
     def _ahk(self, arg):
         """Invoke autohotkey"""
+        winsound.Beep(2000, 100)
         cmd = f"{self.ahk} workout.ahk {arg}"
         os.system(cmd)
+        winsound.Beep(1000, 100)
 
     def start_wo(self, watt, wo):
         """Start workout"""
@@ -101,7 +110,7 @@ class AutoWorkout:
         print(f'''{self.header()} Starting workout "{wo['name']}" (avg power: {watt}), dur: {wo['duration']}''')
         self._ahk(f"start {wo_idx}")
         self.start_time = self.time()
-        self.end_time = self.start_time + wo['duration'] + self.AHK_DELAY + 0.5
+        self.end_time = self.start_time + wo['duration'] + self.AHK_DELAY + 1
 
     def cancel_wo(self):
         """Cancel (force end) current workout"""
@@ -171,8 +180,13 @@ class AutoWorkout:
                 turn_distance = int(distance + avg_speed * 3)
                 if distance > 1000 and (turn_distance % 1000) >= 493:
                     self.uturn()
+                elif distance > 1000 and (turn_distance % 1000) > 480 and (turn_distance % 1000) < 490:
+                    warn()
 
         if self.is_in_workout():
+            if time < self.end_time and self.end_time-time <= 2:
+                warn()
+
             if time >= self.end_time:
                 print('')
                 self.close_dlg()
