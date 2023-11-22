@@ -17,7 +17,7 @@ aw = None
 args = None
 
 MIN_DIST_BEFORE_WORKOUT_IN_UTURN_MODE = 30
-
+N_ARCHES = 10
 
 if os.name=='nt':
     import winsound
@@ -178,7 +178,7 @@ class AutoWorkout:
 
     def _next_climb_arch_m(self, distance: int) -> int:
         assert self.climb_distance_m
-        arch_spacing = self.climb_distance_m // 10
+        arch_spacing = self.climb_distance_m // N_ARCHES
         for i in range(10):
             next_arch = self.lead_in_m + (i+1)*arch_spacing
             if next_arch >= distance:
@@ -187,7 +187,7 @@ class AutoWorkout:
 
     def _can_start_wo(self, distance: int, est_end_distance: int) -> bool:
         if self.climb_distance_m:
-            arch_spacing = self.climb_distance_m // 10
+            arch_spacing = self.climb_distance_m // N_ARCHES
             next_arch = self._next_climb_arch_m(distance)
 
             return (
@@ -291,12 +291,21 @@ class AutoWorkout:
                     self._ahk("spacebar")
                 self.start_wo(watt, wo)
 
+        if self.climb_distance_m:
+            next_arch = self._next_climb_arch_m(distance)
+            if next_arch >= distance:
+                climb_info = f' (climb arch in {(next_arch - distance)/1000:.3f})'
+            else:
+                climb_info = ''
+        else:
+            climb_info = ''
+
         if self.is_in_workout():
             wo_info = f'{self.end_time - time:.0f} secs left [est. end: {est_end_distance/1000:.3f}]'
         else:
             wo_info = prog(time)
 
-        print(f"\r{self.header()} {wo_info} ", end='')
+        print(f"\r{self.header()} {wo_info} {climb_info}", end='')
         sys.stdout.flush()
 
 
