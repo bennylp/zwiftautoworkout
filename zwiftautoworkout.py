@@ -176,19 +176,20 @@ class AutoWorkout:
             avg = self.state['power'].ewm(span=secs, min_periods=1).mean().iloc[-1]
         return None if pd.isna(avg) else int(avg)
 
-    def _next_climb_arch_m(self, distance: int) -> int:
+    def _climb_arch_info(self, distance: int) -> int:
         assert self.climb_distance_m
         arch_spacing = self.climb_distance_m // N_ARCHES
-        for i in range(10):
-            next_arch = self.lead_in_m + (i+1)*arch_spacing
+        for arch_idx in range(10):
+            next_arch = self.lead_in_m + (arch_idx+1)*arch_spacing
             if next_arch >= distance:
                 break
-        return next_arch
+        prev_arch = max(next_arch - arch_spacing, 0)
+        return prev_arch, next_arch, arch_idx
 
     def _can_start_wo(self, distance: int, est_end_distance: int) -> bool:
         if self.climb_distance_m:
             arch_spacing = self.climb_distance_m // N_ARCHES
-            next_arch = self._next_climb_arch_m(distance)
+            prev_arch, next_arch, arch_idx = self._climb_arch_info(distance)
 
             return (
                 # Don't start wo if we're in descent
@@ -223,7 +224,7 @@ class AutoWorkout:
         
     def _check_should_cancel_wo(self, distance: int, est_end_distance: int) -> bool:
         if self.climb_distance_m:
-            next_arch = self._next_climb_arch_m(distance)
+            _, next_arch, _ = self._climb_arch_info(distance)
             return (
                     est_end_distance+10 >= next_arch
             )
@@ -248,6 +249,11 @@ class AutoWorkout:
         avg_speed = self.get_avg_speed()
         nl = False
         est_end_distance = None
+
+        if self.climb_distance_m and distance > self.climb_distance_m + self.lead_in_m:
+            print('')
+            print('Climbing mode ended')
+            self.climb_distance_m = 0
 
         if self.uturn_mode:
             if self.uturn_done:
@@ -292,13 +298,13 @@ class AutoWorkout:
                 self.start_wo(watt, wo)
 
         if self.climb_distance_m:
-            next_arch = self._next_climb_arch_m(distance)
+            _, next_arch, arch_idx = self._climb_arch_info(distance)
             if next_arch >= distance:
-                climb_info = f' (climb arch in {(next_arch - distance)/1000:.3f})'
+                climb_info = f' <climb arch {9-arch_idx} @{next_arch/1000:.1f} in {(next_arch - distance)/1000:.3f}> '
             else:
-                climb_info = ''
+                climb_info = ' '
         else:
-            climb_info = ''
+            climb_info = ' '
 
         if self.is_in_workout():
             wo_info = f'{self.end_time - time:.0f} secs left [est. end: {est_end_distance/1000:.3f}]'
