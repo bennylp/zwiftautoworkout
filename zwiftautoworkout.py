@@ -8,7 +8,6 @@ import websocket
 import pandas as pd
 import numpy as np
 import time
-import winsound
 import xml.etree.ElementTree as ET
 from typing import Literal
 
@@ -20,19 +19,42 @@ args = None
 MIN_DIST_BEFORE_WORKOUT_IN_UTURN_MODE = 30
 
 
+if os.name=='nt':
+    import winsound
+else:
+    class winsound:
+        @staticmethod
+        def Beep(freq: int, duration: int):
+            pass
+
+
 def warn():
     for i in range(3):
         winsound.Beep(2000, 50)
 
 
+def prog(t: float) -> str:
+    s = '|/-\\'
+    return s[int(t) % len(s)]
+
+
 class AutoWorkout:
     AHK_DELAY = 2
 
-    def __init__(self, ftp, watt=None, uturn: bool = False):
+    def __init__(self, ftp, watt=None, uturn: bool = False, 
+                 climb_distance: float = 0, lead_in: float=0):
         print(f"Profile FTP={ftp}")
         self.watt = watt
         self.uturn_mode = uturn
         self.uturn_done = False
+
+        climb_distance = climb_distance or 0
+        assert climb_distance < 50
+        self.climb_distance_m = int(climb_distance * 1000)
+
+        lead_in = lead_in or 0
+        assert lead_in < 15  # lead in is in km
+        self.lead_in_m = int(lead_in * 1000)
 
         # scan workout files
         workouts = []
@@ -68,7 +90,10 @@ class AutoWorkout:
                                   ).set_index('time')
         self.start_time: int = None
         self.end_time: int = None
-        self.ahk: str = "ahk.bat"
+        if os.name=='nt':
+            self.ahk: str = "ahk.bat"
+        else:
+            self.ahk: str = "echo ahk.bat"
         self.last_cancel_time = 0
         self.last_cancel_km = -1
 
@@ -151,20 +176,73 @@ class AutoWorkout:
             avg = self.state['power'].ewm(span=secs, min_periods=1).mean().iloc[-1]
         return None if pd.isna(avg) else int(avg)
 
+    def _next_climb_arch_m(self, distance: int) -> int:
+        assert self.climb_distance_m
+        arch_spacing = self.climb_distance_m // 10
+        for i in range(10):
+            next_arch = self.lead_in_m + (i+1)*arch_spacing
+            if next_arch >= distance:
+                break
+        return next_arch
+
+    def _can_start_wo(self, distance: int, est_end_distance: int) -> bool:
+        if self.climb_distance_m:
+            arch_spacing = self.climb_distance_m // 10
+            next_arch = self._next_climb_arch_m(distance)
+
+            return (
+                # Don't start wo if we're in descent
+                next_arch > distance and
+
+                # Only start if we've passed the arch by some distance
+                # (to allow spin wheel to complete)
+                next_arch - distance < arch_spacing - 40 and
+
+                # Only start if we can end WO before the arch
+                est_end_distance < next_arch - 10 and
+
+                # Get the km bonus (only start if WO can finish within the same km)
+                (est_end_distance+10)//1000 == distance//1000 and
+
+                # Not recently been cancelled
+                self.time() - self.last_cancel_time > 5
+            )
+        else:
+            return (
+                (est_end_distance+10)//1000 == distance//1000 and
+                not (distance//1000 == self.last_cancel_km and
+                     self.time() - self.last_cancel_time <= 5
+                    ) and
+                (
+                    # If we're in U-turn mode, wait some time before starting a workout to allow
+                    # collecting arch bonus
+                    not self.uturn_mode or 
+                    (distance%1000) >= MIN_DIST_BEFORE_WORKOUT_IN_UTURN_MODE
+                )
+            )
+        
+    def _check_should_cancel_wo(self, distance: int, est_end_distance: int) -> bool:
+        if self.climb_distance_m:
+            next_arch = self._next_climb_arch_m(distance)
+            return (
+                    est_end_distance+10 >= next_arch
+            )
+        else:
+            return (
+                    (est_end_distance+10) // 1000 >  distance // 1000 and 
+                    int(distance) % 1000 >= 950
+            )
+
     def update(self, distance: float, time: float, power: float):
         """Update with the last distance, time, and power"""
 
         distance, time, power = int(distance), int(time), int(power)
         self.state.loc[time] = [distance, power]
 
-        def prog(t: float) -> str:
-            s = '|/-\\'
-            return s[int(t) % len(s)]
-
         if len(self.state) > 200:
             self.state = self.state.tail(100)
         elif len(self.state) < 5:
-            print(f"\r{self.header()} {prog(time)}", end='')
+            #print(f"\r{self.header()} {prog(time)}", end='')
             return
 
         avg_speed = self.get_avg_speed()
@@ -193,7 +271,7 @@ class AutoWorkout:
                 nl = True
             else:
                 est_end_distance = int(distance + avg_speed * (self.end_time - time))
-                if ((est_end_distance+10)//1000) >  (distance//1000) and int(distance)%1000 >= 950:
+                if self._check_should_cancel_wo(distance, est_end_distance):
                     print('')
                     print(f'{self.header()} Est. end for cur wo: {(est_end_distance+10)/1000:.3f}')
                     self.cancel_wo()
@@ -204,17 +282,7 @@ class AutoWorkout:
             wo = self.get_matching_wo(watt)
             est_end_distance = int(distance + avg_speed * (wo['duration']+self.AHK_DELAY))
             # Check if new workout can end within this km and we're not recently cancelled
-            if ((est_end_distance+10)//1000 == distance//1000 and not
-                (distance//1000 == self.last_cancel_km and
-                 self.time() - self.last_cancel_time <= 5
-                ) and
-                (
-                    # If we're in U-turn mode, wait some time before starting a workout to allow
-                    # collecting arch bonus
-                    not self.uturn_mode or 
-                    (distance%1000) >= MIN_DIST_BEFORE_WORKOUT_IN_UTURN_MODE
-                )
-                ):
+            if self._can_start_wo(distance, est_end_distance):
                 if not nl:
                     print('')
                 if self.uturn_mode:
@@ -242,7 +310,8 @@ def on_message(ws, raw_msg):
     elif msg['type'] == 'event' and msg['success']:
         data = msg['data']
         if aw is None:
-            aw = AutoWorkout(ftp=data['athlete']['ftp'], watt=args.watt, uturn=args.uturn)
+            aw = AutoWorkout(ftp=data['athlete']['ftp'], watt=args.watt, uturn=args.uturn,
+                             lead_in=args.leadin, climb_distance=args.climb)
 
         d = float(data['state']['distance'])
         t = float(data['state']['time'])
@@ -288,6 +357,38 @@ def main():
     ws.run_forever()
 
 
+def sim():
+    interval = 1.0
+    speed_kph = args.simspeed
+    dist_interval = interval * speed_kph * 1000 / 3600
+
+    distance = 0.0
+    duration = 0.0
+    power = args.watt or 111
+
+    while True:
+        msg = {
+            'type': 'event',
+            'success': True,
+            'data': {
+                'athlete': {
+                    'ftp': 200,
+                },
+                'state': {
+                    'distance': distance,
+                    'time': duration,
+                    'power': power,
+                }
+            }
+        }
+        doc = json.dumps(msg)
+        on_message(None, doc)
+        #time.sleep(interval)
+        time.sleep(0.1)
+        duration += interval
+        distance += dist_interval
+
+
 def test():
     global aw
     ftp = 190
@@ -329,11 +430,15 @@ if __name__ == "__main__":
     parser.add_argument('--watt', type=int, help='Lock workout at this power')
     parser.add_argument('--url', help='Explicit Sauce4Zwift web server URL (start with ws://)')
     parser.add_argument('--uturn', help='Perform U-turn at x.5 km')
-    parser.add_argument('--test', help='Run test', action='store', nargs='*')
+    parser.add_argument('--leadin', help='Lead-in in km', type=float)
+    parser.add_argument('--climb', help='Climb portal length in km', type=float)
+    #parser.add_argument('--test', help='Run test', action='store', nargs='*')
+    parser.add_argument('--sim', help='Simulation mode', action='store', nargs='*')
+    parser.add_argument('--simspeed', help='Speed (kph)', type=float, default=20.0)
     
     args = parser.parse_args()
 
-    if args.test is not None:
-        test()
+    if args.sim is not None:
+        sim()
     else:
         main()
