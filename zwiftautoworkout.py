@@ -19,6 +19,12 @@ args = None
 MIN_DIST_BEFORE_WORKOUT_IN_UTURN_MODE = 30
 N_ARCHES = 10
 AUTO_ADJUST_RESISTANCE_INTERVAL = 5
+MIN_TRAINER_RESISTANCE = -10
+MAX_TRAINER_RESISTANCE = 12
+DEFAULT_TRAINER_RESISTANCE = -4
+MIN_TRAINER_GRADE = -0.1
+MAX_TRAINER_GRADE = 0.15
+
 
 if os.name=='nt':
     import winsound
@@ -43,7 +49,7 @@ class AutoWorkout:
     AHK_DELAY = 2
 
     def __init__(self, ftp, watt=None, uturn: bool = False, erg = False,
-                 climb_distance: float = 0, lead_in: float=0):
+                 climb_distance: float = 0, lead_in: float=0, res: int = DEFAULT_TRAINER_RESISTANCE):
         print(f"Profile FTP={ftp}")
         self.watt = watt
         self.uturn_mode = uturn
@@ -101,12 +107,7 @@ class AutoWorkout:
 
         self.avg_speed_kph = 0
 
-        self.MIN_TRAINER_RESISTANCE = -10
-        self.MAX_TRAINER_RESISTANCE = 12
-        self.DEFAULT_TRAINER_RESISTANCE = -4
-        self.cur_trainer_resistance = self.DEFAULT_TRAINER_RESISTANCE
-        self.MIN_TRAINER_GRADE = -0.1
-        self.MAX_TRAINER_GRADE = 0.15
+        self.cur_trainer_resistance = res
         self.last_adjust_resistance = 0
 
     def is_in_workout(self) -> bool:
@@ -134,12 +135,14 @@ class AutoWorkout:
         loc = self.workouts.index.get_loc(watt, method='nearest')
         return self.workouts.iloc[loc]
 
-    def _ahk(self, arg):
+    def _ahk(self, arg: str, beep=True):
         """Invoke autohotkey"""
-        winsound.Beep(2000, 100)
+        if beep:
+            winsound.Beep(2000, 100)
         cmd = f"{self.ahk} workout.ahk {arg}"
         os.system(cmd)
-        winsound.Beep(1000, 100)
+        if beep:
+            winsound.Beep(1000, 100)
 
     def start_wo(self, watt, wo):
         """Start workout"""
@@ -254,12 +257,20 @@ class AutoWorkout:
             )
 
     def get_trainer_resistance_for_grade(self, grade: float) -> int:
-        grade_ratio = (grade-self.MAX_TRAINER_GRADE) / (self.MAX_TRAINER_GRADE - self.MIN_TRAINER_GRADE)
-        target_resistance = self.MIN_TRAINER_RESISTANCE + self.DEFAULT_TRAINER_RESISTANCE + grade_ratio * (self.MAX_TRAINER_RESISTANCE - self.MIN_TRAINER_RESISTANCE)
-        target_resistance = int(target_resistance)
-        target_resistance = max(target_resistance, self.MIN_TRAINER_RESISTANCE)
-        trainer_resistance = min(target_resistance, self.MAX_TRAINER_RESISTANCE)
-        return trainer_resistance
+        if grade >= 0:
+            target_resistance = (
+                DEFAULT_TRAINER_RESISTANCE +
+                (grade / MAX_TRAINER_GRADE) * (MAX_TRAINER_RESISTANCE - DEFAULT_TRAINER_RESISTANCE)
+            )
+        else:
+            target_resistance = (
+                DEFAULT_TRAINER_RESISTANCE +
+                (grade / MIN_TRAINER_GRADE) * (MIN_TRAINER_RESISTANCE - DEFAULT_TRAINER_RESISTANCE)
+            )
+        target_resistance = round(target_resistance)
+        target_resistance = max(target_resistance, MIN_TRAINER_RESISTANCE)
+        target_resistance = min(target_resistance, MAX_TRAINER_RESISTANCE)
+        return target_resistance
 
     def adjust_resistance(self, grade: float):
         now = time.time()
@@ -267,25 +278,17 @@ class AutoWorkout:
             return
         
         self.last_adjust_resistance = now
-        trainer_resistance = self.get_trainer_resistance_for_grade(grade)
-        res_diff = self.cur_trainer_resistance - trainer_resistance
-        print('')
-        print(f'Grade={grade:.1%}, res cur={self.cur_trainer_resistance}, target={trainer_resistance}, diff={res_diff}')
-        if res_diff <= 2 and res_diff >= -2:
+        res = self.get_trainer_resistance_for_grade(grade)
+        res_diff = res - self.cur_trainer_resistance
+        if res_diff==0:
             return
-        self._ahk(f"setresistance {res_diff}")
-        self.cur_trainer_resistance = trainer_resistance
+        print('')
+        print(f'Grade={grade:.1%}, res cur={self.cur_trainer_resistance}, target={res}, diff={res_diff}')
+        self._ahk(f"setresistance {res_diff}", beep=False)
+        self.cur_trainer_resistance = res
 
     def update(self, distance: float, time: float, power: float, data: dict):
         """Update with the last distance, time, and power"""
-
-        grade = -0.20
-        while grade < 0.3:
-            res = self.get_trainer_resistance_for_grade(grade)
-            print(f'{grade:.1%}\t{res}')
-            grade += 0.005
-
-        sys.exit(0)
 
         distance, time, power = int(distance), int(time), int(power)
         self.state.loc[time] = [distance, power]
@@ -364,7 +367,7 @@ class AutoWorkout:
             climb_info = ' '
 
         if True:
-            extra_info = f' (grade: {grade:.3f}, elev={elev:.1f})'
+            extra_info = f' (grade: {grade:.3f}, res={self.cur_trainer_resistance})'
         else:
             extra_info = ' '
 
@@ -514,6 +517,8 @@ if __name__ == "__main__":
     parser.add_argument('--sim', help='Simulation mode', action='store', nargs='*')
     parser.add_argument('--simspeed', help='Speed (kph)', type=float, default=20.0)
     parser.add_argument('--erg', help='ERG mode', action='store', nargs='*')
+    parser.add_argument('--res', help='Set initial trainer resistance', type=int,
+                        default=DEFAULT_TRAINER_RESISTANCE)
     
     args = parser.parse_args()
 

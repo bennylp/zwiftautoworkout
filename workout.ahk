@@ -80,7 +80,8 @@ SetResistance(n)
     {
         Loop n
         {
-            Send( "+" )
+            ; Send( "+" )
+            ControlSend "+", , ZTITLE
             Sleep( 500 )
         }
     }
@@ -88,7 +89,8 @@ SetResistance(n)
     {
         Loop 0-n
         {
-            Send( "-" )
+            ; Send( "-" )
+            ControlSend "-", , ZTITLE
             Sleep( 500 )
         }
     }
@@ -136,7 +138,8 @@ else if (cmd = "spacebar")
 }
 else if (cmd = "setresistance")
 {
-    ActivateZwift()
+    ; WinActivate(ZTITLE)
+    ; Sleep(100)
     n := Integer(A_Args[2])
     SetResistance(n)
 }
