@@ -74,6 +74,27 @@ CancelWorkout()
     }
 }
 
+SetResistance(n)
+{
+    if (n > 0)
+    {
+        Loop n
+        {
+            Send( "+" )
+            Sleep( 500 )
+        }
+    }
+    else if (n < 0)
+    {
+        Loop 0-n
+        {
+            Send( "-" )
+            Sleep( 500 )
+        }
+    }
+}
+
+
 cmd := A_Args[1]
 
 if (cmd = "start" )
@@ -112,6 +133,12 @@ else if (cmd = "spacebar")
 {
     ActivateZwift()
     Send("{Space}")
+}
+else if (cmd = "setresistance")
+{
+    ActivateZwift()
+    n := Integer(A_Args[2])
+    SetResistance(n)
 }
 else if (cmd = "info")
 {

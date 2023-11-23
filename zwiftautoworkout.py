@@ -18,6 +18,7 @@ args = None
 
 MIN_DIST_BEFORE_WORKOUT_IN_UTURN_MODE = 30
 N_ARCHES = 10
+AUTO_ADJUST_RESISTANCE_INTERVAL = 5
 
 if os.name=='nt':
     import winsound
@@ -41,12 +42,13 @@ def prog(t: float) -> str:
 class AutoWorkout:
     AHK_DELAY = 2
 
-    def __init__(self, ftp, watt=None, uturn: bool = False, 
+    def __init__(self, ftp, watt=None, uturn: bool = False, erg = False,
                  climb_distance: float = 0, lead_in: float=0):
         print(f"Profile FTP={ftp}")
         self.watt = watt
         self.uturn_mode = uturn
         self.uturn_done = False
+        self.erg = erg
 
         climb_distance = climb_distance or 0
         assert climb_distance < 50
@@ -96,6 +98,16 @@ class AutoWorkout:
             self.ahk: str = "echo ahk.bat"
         self.last_cancel_time = 0
         self.last_cancel_km = -1
+
+        self.avg_speed_kph = 0
+
+        self.MIN_TRAINER_RESISTANCE = -10
+        self.MAX_TRAINER_RESISTANCE = 12
+        self.DEFAULT_TRAINER_RESISTANCE = -4
+        self.cur_trainer_resistance = self.DEFAULT_TRAINER_RESISTANCE
+        self.MIN_TRAINER_GRADE = -0.1
+        self.MAX_TRAINER_GRADE = 0.15
+        self.last_adjust_resistance = 0
 
     def is_in_workout(self) -> bool:
         return self.end_time is not None
@@ -160,6 +172,13 @@ class AutoWorkout:
     def get_avg_speed(self, secs: int = 5, output: Literal['mps', 'kph', 'mph']='mps') -> float:
         """Get current avg speed for the past secs seconds, in meter per second,
         km/h, or miles/h"""
+        kph = self.avg_speed_kph
+        if output=='kph':
+            return kph
+        elif output=='mps':
+            return kph * 1000 / 3600.0
+        else:
+            assert False
         df = self.state.tail(secs+1)
         d_dist = (df['distance'].iloc[-2] - df['distance'].iloc[0]) / 1
         d_time = (df.index[-2] - df.index[0]) / 1
@@ -234,8 +253,39 @@ class AutoWorkout:
                     int(distance) % 1000 >= 950
             )
 
-    def update(self, distance: float, time: float, power: float):
+    def get_trainer_resistance_for_grade(self, grade: float) -> int:
+        grade_ratio = (grade-self.MAX_TRAINER_GRADE) / (self.MAX_TRAINER_GRADE - self.MIN_TRAINER_GRADE)
+        target_resistance = self.MIN_TRAINER_RESISTANCE + self.DEFAULT_TRAINER_RESISTANCE + grade_ratio * (self.MAX_TRAINER_RESISTANCE - self.MIN_TRAINER_RESISTANCE)
+        target_resistance = int(target_resistance)
+        target_resistance = max(target_resistance, self.MIN_TRAINER_RESISTANCE)
+        trainer_resistance = min(target_resistance, self.MAX_TRAINER_RESISTANCE)
+        return trainer_resistance
+
+    def adjust_resistance(self, grade: float):
+        now = time.time()
+        if now - self.last_adjust_resistance < AUTO_ADJUST_RESISTANCE_INTERVAL:
+            return
+        
+        self.last_adjust_resistance = now
+        trainer_resistance = self.get_trainer_resistance_for_grade(grade)
+        res_diff = self.cur_trainer_resistance - trainer_resistance
+        print('')
+        print(f'Grade={grade:.1%}, res cur={self.cur_trainer_resistance}, target={trainer_resistance}, diff={res_diff}')
+        if res_diff <= 2 and res_diff >= -2:
+            return
+        self._ahk(f"setresistance {res_diff}")
+        self.cur_trainer_resistance = trainer_resistance
+
+    def update(self, distance: float, time: float, power: float, data: dict):
         """Update with the last distance, time, and power"""
+
+        grade = -0.20
+        while grade < 0.3:
+            res = self.get_trainer_resistance_for_grade(grade)
+            print(f'{grade:.1%}\t{res}')
+            grade += 0.005
+
+        sys.exit(0)
 
         distance, time, power = int(distance), int(time), int(power)
         self.state.loc[time] = [distance, power]
@@ -246,7 +296,14 @@ class AutoWorkout:
             #print(f"\r{self.header()} {prog(time)}", end='')
             return
 
+        elev = data['state']['altitude']
+        grade = data['state']['grade']
+        self.avg_speed_kph = data['state']['speed']
         avg_speed = self.get_avg_speed()
+
+        if not self.erg and self.is_in_workout():
+            self.adjust_resistance(grade)
+
         nl = False
         est_end_distance = None
 
@@ -306,12 +363,17 @@ class AutoWorkout:
         else:
             climb_info = ' '
 
+        if True:
+            extra_info = f' (grade: {grade:.3f}, elev={elev:.1f})'
+        else:
+            extra_info = ' '
+
         if self.is_in_workout():
             wo_info = f'{self.end_time - time:.0f} secs left [est. end: {est_end_distance/1000:.3f}]'
         else:
             wo_info = prog(time)
 
-        print(f"\r{self.header()} {wo_info} {climb_info}", end='')
+        print(f"\r{self.header()} {wo_info} {climb_info} {extra_info}", end='')
         sys.stdout.flush()
 
 
@@ -326,12 +388,13 @@ def on_message(ws, raw_msg):
         data = msg['data']
         if aw is None:
             aw = AutoWorkout(ftp=data['athlete']['ftp'], watt=args.watt, uturn=args.uturn,
-                             lead_in=args.leadin, climb_distance=args.climb)
+                             lead_in=args.leadin, climb_distance=args.climb,
+                             erg=args.erg is not None)
 
         d = float(data['state']['distance'])
         t = float(data['state']['time'])
         p = float(data['state']['power'])
-        aw.update(d, t, p)
+        aw.update(d, t, p, data)
 
 def on_error(ws, error):
     print("socket error", error)
@@ -450,6 +513,7 @@ if __name__ == "__main__":
     #parser.add_argument('--test', help='Run test', action='store', nargs='*')
     parser.add_argument('--sim', help='Simulation mode', action='store', nargs='*')
     parser.add_argument('--simspeed', help='Speed (kph)', type=float, default=20.0)
+    parser.add_argument('--erg', help='ERG mode', action='store', nargs='*')
     
     args = parser.parse_args()
 
