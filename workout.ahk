@@ -76,13 +76,16 @@ CancelWorkout()
 
 SetResistance(n)
 {
+    ;ControlSend "{Esc}", , ZTITLE
+    ;sleep(500)    
+
     if (n > 0)
     {
         Loop n
         {
             ; Send( "+" )
-            ControlSend "+", , ZTITLE
-            Sleep( 500 )
+            ControlSend "=", , ZTITLE
+            Sleep( 250 )
         }
     }
     else if (n < 0)
@@ -91,7 +94,7 @@ SetResistance(n)
         {
             ; Send( "-" )
             ControlSend "-", , ZTITLE
-            Sleep( 500 )
+            Sleep( 250 )
         }
     }
 }

@@ -19,11 +19,11 @@ args = None
 MIN_DIST_BEFORE_WORKOUT_IN_UTURN_MODE = 30
 N_ARCHES = 10
 AUTO_ADJUST_RESISTANCE_INTERVAL = 5
-MIN_TRAINER_RESISTANCE = -10
-MAX_TRAINER_RESISTANCE = 12
-DEFAULT_TRAINER_RESISTANCE = -4
-MIN_TRAINER_GRADE = -0.1
-MAX_TRAINER_GRADE = 0.15
+MIN_TRAINER_RESISTANCE = -8
+MAX_TRAINER_RESISTANCE = 15
+DEFAULT_TRAINER_RESISTANCE = 0
+MIN_TRAINER_GRADE = -0.05
+MAX_TRAINER_GRADE = 0.1
 
 
 if os.name=='nt':
@@ -280,12 +280,13 @@ class AutoWorkout:
         self.last_adjust_resistance = now
         res = self.get_trainer_resistance_for_grade(grade)
         res_diff = res - self.cur_trainer_resistance
-        if res_diff==0:
+        if res_diff > -1 and res_diff < 1:
             return
         print('')
         print(f'Grade={grade:.1%}, res cur={self.cur_trainer_resistance}, target={res}, diff={res_diff}')
         self._ahk(f"setresistance {res_diff}", beep=False)
         self.cur_trainer_resistance = res
+        self.last_adjust_resistance = time.time()
 
     def update(self, distance: float, time: float, power: float, data: dict):
         """Update with the last distance, time, and power"""
